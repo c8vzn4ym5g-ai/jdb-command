@@ -1,0 +1,26 @@
+name: Release Obsidian plugin
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify release tag
+        shell: bash
+        run: |
+          version=$(node -p "require('./manifest.json').version")
+          test "$GITHUB_REF_NAME" = "$version"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            main.js
+            manifest.json
+            styles.css
