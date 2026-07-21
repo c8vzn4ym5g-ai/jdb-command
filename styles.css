@@ -1,0 +1,26 @@
+.jdb-command { padding: 1rem; border: 1px solid var(--background-modifier-border); border-radius: 18px; background: linear-gradient(150deg, var(--background-secondary), var(--background-primary)); box-shadow: 0 10px 30px rgba(0, 0, 0, .08); }
+.jdb-command h2 { margin: 0; font-size: 1.45rem; }
+.jdb-command-version { margin-top: .15rem; color: var(--text-faint); font-size: .72rem; }
+.jdb-command-intro { margin: .75rem 0 .35rem; color: var(--text-muted); line-height: 1.55; }
+.jdb-command-text { width: 100%; resize: vertical; font-size: 1rem; padding: .8rem; margin: .5rem 0; }
+.jdb-command-route, .jdb-command-status { margin: .5rem 0; color: var(--text-muted); }
+.jdb-command-files { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.jdb-command-add-files { width: 100%; min-height: 52px; margin: .6rem 0; border: 1.5px dashed var(--interactive-accent); border-radius: 12px; color: var(--interactive-accent); font-weight: 650; }
+.jdb-command-selection { margin: .4rem 0; color: var(--text-muted); }
+.jdb-command-selection ul { margin: .35rem 0 .6rem 1.25rem; }
+.jdb-command-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: .6rem; margin: .6rem 0; }
+.jdb-command-preview-item { min-width: 0; padding: .4rem; border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--background-primary); }
+.jdb-command-preview-item img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; }
+.jdb-command-preview-item span { display: block; margin-top: .35rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; }
+.jdb-command-remove-file { width: 100%; min-height: 34px; margin-top: .35rem; color: var(--text-error); }
+.jdb-command-preview-file { display: grid; place-items: center; width: 100%; aspect-ratio: 1; border-radius: 7px; background: var(--background-secondary-alt); color: var(--text-muted); }
+.jdb-command-clear-files { width: 100%; margin-bottom: .6rem; }
+.jdb-command-submit { width: 100%; min-height: 54px; font-size: 1.05rem; font-weight: 700; border-radius: 12px; }
+.jdb-command-receipt { margin-top: 1rem; padding: .9rem; border: 2px solid var(--interactive-accent); border-radius: 12px; background: var(--background-primary); }
+.jdb-command-receipt h3 { margin: 0 0 .55rem; }
+.jdb-command-receipt > div { margin: .25rem 0; }
+.jdb-command-receipt button { width: 100%; min-height: 42px; margin-top: .6rem; }
+@media (max-width: 480px) {
+  .jdb-command { padding: .85rem; border-radius: 16px; }
+  .jdb-command-preview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
