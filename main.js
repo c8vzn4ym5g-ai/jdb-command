@@ -23,6 +23,12 @@ function arrayBufferToBase64(buffer) {
   return globalThis.btoa(binary);
 }
 
+function formatRecordingTime(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 async function sha256Hex(buffer) {
   const digest = await globalThis.crypto.subtle.digest("SHA-256", buffer);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -74,13 +80,15 @@ class JdbCommandPlugin extends Plugin {
     wrapper.createDiv({ cls: "jdb-command-version", text: `JDB Command v${this.manifest.version}` });
     wrapper.createEl("p", { cls: "jdb-command-intro", text: "一句話交代工作，需要時加入照片、語音或檔案。JDB 會自動判斷 Project。" });
 
-    const textarea = wrapper.createEl("textarea", { cls: "jdb-command-text" });
+    const commandInput = wrapper.createDiv({ cls: "jdb-command-input" });
+    const textarea = commandInput.createEl("textarea", { cls: "jdb-command-text" });
     textarea.placeholder = "例如：把這 17 張照片放入 Travel OS 的 Coffee，製作 3 篇遊記。";
     textarea.rows = 5;
     textarea.setAttribute("aria-label", "JDB 工作指令");
     const route = wrapper.createDiv({ cls: "jdb-command-route", text: "Project：JDB 自動判斷" });
     textarea.addEventListener("input", () => { route.textContent = `Project：${routeCommand(textarea.value).label}`; });
 
+    const selectedInstructionFiles = [];
     const selectedFiles = [];
     const fileInput = wrapper.createEl("input", { cls: "jdb-command-files", type: "file" });
     fileInput.multiple = true;
@@ -88,13 +96,21 @@ class JdbCommandPlugin extends Plugin {
     fileInput.setAttribute("aria-label", "選擇照片、語音或檔案");
     const addFiles = wrapper.createEl("button", { cls: "jdb-command-add-files", text: "加入照片／檔案" });
     addFiles.type = "button";
-    const voiceActions = wrapper.createDiv({ cls: "jdb-command-voice-actions" });
+    const voiceActions = commandInput.createDiv({ cls: "jdb-command-voice-actions" });
     const recordVoice = voiceActions.createEl("button", { cls: "jdb-command-record-voice", text: "開始錄音" });
     recordVoice.type = "button";
     const stopVoice = voiceActions.createEl("button", { cls: "jdb-command-stop-voice", text: "停止錄音" });
     stopVoice.type = "button";
     stopVoice.hidden = true;
-    const recordingStatus = wrapper.createDiv({ cls: "jdb-command-recording-status", text: "尚未錄音", attr: { role: "status", "aria-live": "polite" } });
+    const recordingStatus = commandInput.createDiv({ cls: "jdb-command-recording-status", text: "可輸入文字，或按麥克風錄製語音指令", attr: { role: "status", "aria-live": "polite" } });
+    const instructionFileInput = commandInput.createEl("input", { cls: "jdb-command-instruction-files", type: "file" });
+    instructionFileInput.multiple = true;
+    instructionFileInput.accept = "audio/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md";
+    instructionFileInput.setAttribute("aria-label", "選擇包含指令的檔案");
+    const addInstructionFiles = commandInput.createEl("button", { cls: "jdb-command-add-instruction-files", text: "匯入指令檔案" });
+    addInstructionFiles.type = "button";
+    const instructionSelection = commandInput.createDiv({ cls: "jdb-command-instruction-selection", text: "尚未匯入指令檔案" });
+    const instructionPreview = commandInput.createDiv({ cls: "jdb-command-preview jdb-command-instruction-preview" });
     const selection = wrapper.createDiv({ cls: "jdb-command-selection", text: "尚未加入檔案" });
     const preview = wrapper.createDiv({ cls: "jdb-command-preview" });
     const clearFiles = wrapper.createEl("button", { cls: "jdb-command-clear-files", text: "清除已選檔案" });
@@ -149,6 +165,53 @@ class JdbCommandPlugin extends Plugin {
     let recorder = null;
     let recordingStream = null;
     let recordingChunks = [];
+    let recordingTimer = null;
+    let elapsedSeconds = 0;
+    const clearRecordingTimer = () => {
+      if (recordingTimer) clearInterval(recordingTimer);
+      recordingTimer = null;
+    };
+
+    const renderInstructionSelection = () => {
+      instructionSelection.empty();
+      instructionPreview.empty();
+      if (!selectedInstructionFiles.length) {
+        instructionSelection.setText("尚未匯入指令檔案");
+        return;
+      }
+      instructionSelection.createEl("strong", { text: `已匯入 ${selectedInstructionFiles.length} 個指令來源` });
+      for (const entry of selectedInstructionFiles) {
+        const item = instructionPreview.createDiv({ cls: "jdb-command-preview-item" });
+        if (entry.file.type.startsWith("audio/")) {
+          const audio = item.createEl("audio", { attr: { controls: "", preload: "metadata" } });
+          audio.src = URL.createObjectURL(entry.file);
+          audio.addEventListener("loadedmetadata", () => URL.revokeObjectURL(audio.src), { once: true });
+        } else {
+          item.createDiv({ cls: "jdb-command-preview-file", text: "指令檔案" });
+        }
+        item.createEl("span", { text: entry.file.name, attr: { title: entry.file.name } });
+        const remove = item.createEl("button", { cls: "jdb-command-remove-file", text: "移除" });
+        remove.type = "button";
+        remove.addEventListener("click", () => {
+          const index = selectedInstructionFiles.findIndex((selected) => selected.key === entry.key);
+          if (index >= 0) selectedInstructionFiles.splice(index, 1);
+          renderInstructionSelection();
+        });
+      }
+    };
+
+    addInstructionFiles.addEventListener("click", () => instructionFileInput.click());
+    instructionFileInput.addEventListener("change", () => {
+      for (const file of Array.from(instructionFileInput.files || [])) {
+        const key = `${file.name}:${file.size}:${file.lastModified}`;
+        if (!selectedInstructionFiles.some((entry) => entry.key === key)) selectedInstructionFiles.push({ key, file });
+      }
+      instructionFileInput.value = "";
+      renderInstructionSelection();
+    });
+    const showRecordingProgress = () => {
+      recordingStatus.textContent = `正在錄音 ${formatRecordingTime(elapsedSeconds)} · 完成後按「停止錄音」`;
+    };
     const releaseMicrophone = () => {
       if (recordingStream) recordingStream.getTracks().forEach((track) => track.stop());
       recordingStream = null;
@@ -167,6 +230,8 @@ class JdbCommandPlugin extends Plugin {
           if (event.data?.size) recordingChunks.push(event.data);
         });
         recorder.addEventListener("stop", () => {
+          clearRecordingTimer();
+          recordingStatus.classList.remove("is-recording");
           const type = recorder.mimeType || recordingChunks[0]?.type || "audio/webm";
           const extension = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
           const blob = new Blob(recordingChunks, { type });
@@ -174,9 +239,9 @@ class JdbCommandPlugin extends Plugin {
             const stamp = new Date().toISOString().replace(/[:.]/g, "-");
             const file = new File([blob], `JDB-voice-${stamp}.${extension}`, { type, lastModified: Date.now() });
             const key = `${file.name}:${file.size}:${file.lastModified}`;
-            selectedFiles.push({ key, file });
-            renderSelection();
-            recordingStatus.textContent = `錄音已加入：${file.name}（送交前可播放、移除或繼續加入檔案）`;
+            selectedInstructionFiles.push({ key, file });
+            renderInstructionSelection();
+            recordingStatus.textContent = `語音指令已加入：${file.name}（送交前可播放或移除）`;
           } else {
             recordingStatus.textContent = "沒有收到錄音內容，請再試一次。";
           }
@@ -187,16 +252,26 @@ class JdbCommandPlugin extends Plugin {
           stopVoice.hidden = true;
         });
         recorder.addEventListener("error", () => {
+          clearRecordingTimer();
+          recordingStatus.classList.remove("is-recording");
           recordingStatus.textContent = "錄音失敗，麥克風已停止。";
           releaseMicrophone();
           recordVoice.hidden = false;
           stopVoice.hidden = true;
         });
         recorder.start();
+        elapsedSeconds = 0;
+        recordingStatus.classList.add("is-recording");
+        showRecordingProgress();
+        recordingTimer = setInterval(() => {
+          elapsedSeconds += 1;
+          showRecordingProgress();
+        }, 1000);
         recordVoice.hidden = true;
         stopVoice.hidden = false;
-        recordingStatus.textContent = "正在錄音…完成後請按「停止錄音」。";
       } catch (error) {
+        clearRecordingTimer();
+        recordingStatus.classList.remove("is-recording");
         console.error("JDB voice recording failed", error);
         releaseMicrophone();
         recordingStatus.textContent = "無法使用麥克風。請允許 Obsidian 使用麥克風，或加入既有錄音檔。";
@@ -245,15 +320,17 @@ class JdbCommandPlugin extends Plugin {
     };
     submit.addEventListener("click", async () => {
       const command = textarea.value.trim();
-      if (!command) { new Notice("請先輸入要交代 JDB 的工作。"); textarea.focus(); return; }
+      if (!command && !selectedInstructionFiles.length) { new Notice("請輸入文字、錄製語音，或匯入一個指令檔案。"); textarea.focus(); return; }
       submit.disabled = true;
       status.textContent = "正在送交…";
       try {
-        const result = await this.submit(command, selectedFiles.map((entry) => entry.file));
+        const result = await this.submit(command, selectedInstructionFiles.map((entry) => entry.file), selectedFiles.map((entry) => entry.file));
         textarea.value = "";
+        selectedInstructionFiles.splice(0, selectedInstructionFiles.length);
+        renderInstructionSelection();
         selectedFiles.splice(0, selectedFiles.length);
         renderSelection();
-        recordingStatus.textContent = "尚未錄音";
+        recordingStatus.textContent = "可輸入文字，或按麥克風錄製語音指令";
         route.textContent = "Project：JDB 自動判斷";
         status.textContent = `送交成功：${result.id}`;
         renderReceipt(result);
@@ -268,7 +345,7 @@ class JdbCommandPlugin extends Plugin {
     });
   }
 
-  async submit(command, files) {
+  async submit(command, instructionFiles, files) {
     const now = new Date();
     const stamp = now.toISOString().replace(/[-:TZ.]/g, "").slice(0, 17);
     const random = Math.random().toString(16).slice(2, 10);
@@ -276,12 +353,17 @@ class JdbCommandPlugin extends Plugin {
     const routed = routeCommand(command);
     const commandFolder = normalizePath("inbox/commands");
     await this.ensureFolder("inbox/commands");
-    const links = [];
+    const instructionLinks = [];
+    const attachmentLinks = [];
     const savedFiles = [];
     const createdPaths = [];
     try {
-      for (let index = 0; index < files.length; index += 1) {
-        const file = files[index];
+      const sources = [
+        ...instructionFiles.map((file) => ({ file, role: "instruction" })),
+        ...files.map((file) => ({ file, role: "attachment" }))
+      ];
+      for (let index = 0; index < sources.length; index += 1) {
+        const { file, role } = sources[index];
         const safeName = file.name.replace(/[\\/:*?"<>|]/g, "-");
         const path = normalizePath(`${commandFolder}/${id}-${index + 1}-${safeName}`);
         const buffer = await file.arrayBuffer();
@@ -291,7 +373,7 @@ class JdbCommandPlugin extends Plugin {
           createdPaths.push(path);
           const verified = this.app.vault.getAbstractFileByPath(path);
           if (!verified || verified.stat.size !== file.size) throw new Error(`Attachment verification failed: ${path}`);
-          links.push(`- [[${path}]]`);
+          (role === "instruction" ? instructionLinks : attachmentLinks).push(`- [[${path}]]`);
           resourceUrl = file.type.startsWith("image/") ? this.app.vault.getResourcePath(created) : "";
         } else {
           const parts = splitArrayBuffer(buffer);
@@ -310,7 +392,7 @@ class JdbCommandPlugin extends Plugin {
           await this.app.vault.create(manifestPath, manifest);
           createdPaths.push(manifestPath);
           if (!this.app.vault.getAbstractFileByPath(manifestPath)) throw new Error(`Manifest verification failed: ${manifestPath}`);
-          links.push(`- [[${manifestPath}]]`);
+          (role === "instruction" ? instructionLinks : attachmentLinks).push(`- [[${manifestPath}]]`);
           resourceUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
         }
         savedFiles.push({
@@ -318,13 +400,14 @@ class JdbCommandPlugin extends Plugin {
           name: file.name,
           size: file.size,
           type: file.type,
-          resourceUrl
+          resourceUrl,
+          role
         });
       }
       const note = [
         "---", `id: ${id}`, "type: mission", "status: queued", `project: ${routed.id}`,
-        `created: ${now.toISOString()}`, "source: jdb-command", `attachment_count: ${links.length}`, "---", "",
-        "# JDB Command", "", command, "", "## Attachments", "", ...(links.length ? links : ["- None"]), ""
+        `created: ${now.toISOString()}`, "source: jdb-command", `instruction_source_count: ${instructionLinks.length}`, `attachment_count: ${attachmentLinks.length}`, "---", "",
+        "# JDB Command", "", command || "（指令內容由匯入檔案提供）", "", "## Instruction Sources", "", ...(instructionLinks.length ? instructionLinks : ["- None"]), "", "## Attachments", "", ...(attachmentLinks.length ? attachmentLinks : ["- None"]), ""
       ].join("\n");
       const notePath = normalizePath(`${commandFolder}/${id}.md`);
       await this.app.vault.create(notePath, note);
@@ -346,4 +429,4 @@ class JdbCommandPlugin extends Plugin {
 }
 
 module.exports = JdbCommandPlugin;
-module.exports.__test = { splitArrayBuffer, arrayBufferToBase64, SYNC_SAFE_CHUNK_BYTES };
+module.exports.__test = { splitArrayBuffer, arrayBufferToBase64, formatRecordingTime, SYNC_SAFE_CHUNK_BYTES };

@@ -2,15 +2,23 @@
 .jdb-command h2 { margin: 0; font-size: 1.45rem; }
 .jdb-command-version { margin-top: .15rem; color: var(--text-faint); font-size: .72rem; }
 .jdb-command-intro { margin: .75rem 0 .35rem; color: var(--text-muted); line-height: 1.55; }
-.jdb-command-text { width: 100%; resize: vertical; font-size: 1rem; padding: .8rem; margin: .5rem 0; }
+.jdb-command-input { margin: .5rem 0; padding: .65rem; border: 1.5px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); }
+.jdb-command-text { width: 100%; resize: vertical; font-size: 1rem; padding: .55rem; margin: 0; border: 0; box-shadow: none; background: transparent; }
 .jdb-command-route, .jdb-command-status { margin: .5rem 0; color: var(--text-muted); }
-.jdb-command-files { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.jdb-command-files, .jdb-command-instruction-files { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.jdb-command-add-instruction-files { width: 100%; min-height: 44px; margin-top: .45rem; border-radius: 10px; color: var(--interactive-accent); }
+.jdb-command-instruction-selection { margin-top: .45rem; color: var(--text-muted); font-size: .82rem; }
+.jdb-command-instruction-preview { margin-bottom: 0; }
 .jdb-command-add-files { width: 100%; min-height: 52px; margin: .6rem 0; border: 1.5px dashed var(--interactive-accent); border-radius: 12px; color: var(--interactive-accent); font-weight: 650; }
-.jdb-command-voice-actions { display: grid; grid-template-columns: 1fr; gap: .5rem; }
+.jdb-command-voice-actions { display: grid; grid-template-columns: 1fr; gap: .5rem; margin-top: .4rem; }
 .jdb-command-record-voice, .jdb-command-stop-voice { width: 100%; min-height: 52px; border-radius: 12px; font-weight: 650; }
 .jdb-command-record-voice { color: var(--interactive-accent); border: 1.5px solid var(--interactive-accent); }
 .jdb-command-stop-voice { color: var(--text-on-accent); background: var(--text-error); }
+.jdb-command-stop-voice:not([hidden]) { display: block; box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-error) 24%, transparent); }
 .jdb-command-recording-status { margin: .25rem 0 .6rem; color: var(--text-muted); font-size: .86rem; line-height: 1.45; }
+.jdb-command-recording-status.is-recording { display: flex; align-items: center; gap: .45rem; color: var(--text-error); font-weight: 700; }
+.jdb-command-recording-status.is-recording::before { content: ""; flex: 0 0 auto; width: .7rem; height: .7rem; border-radius: 50%; background: var(--text-error); animation: jdb-recording-pulse 1s ease-in-out infinite; }
+@keyframes jdb-recording-pulse { 50% { opacity: .35; transform: scale(.78); } }
 .jdb-command-selection { margin: .4rem 0; color: var(--text-muted); }
 .jdb-command-selection ul { margin: .35rem 0 .6rem 1.25rem; }
 .jdb-command-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: .6rem; margin: .6rem 0; }

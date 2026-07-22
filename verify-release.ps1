@@ -15,6 +15,8 @@ $checks = [ordered]@{
   'ui.single-screen-actions' = ($main.Contains('jdb-command-add-files') -and $main.Contains('jdb-command-submit') -and $main.Contains('jdb-command-receipt'))
   'ui.preview-and-remove' = ($main.Contains('URL.createObjectURL') -and $main.Contains('jdb-command-remove-file') -and $main.Contains('aria-live'))
   'ui.voice-recording' = ($main.Contains('jdb-command-record-voice') -and $main.Contains('jdb-command-stop-voice') -and $main.Contains('navigator.mediaDevices.getUserMedia') -and $main.Contains('new MediaRecorder'))
+  'ui.voice-is-command-input' = ($main.Contains('jdb-command-input') -and $main.Contains('formatRecordingTime(elapsedSeconds)') -and $main.Contains('recordingStatus.classList.add("is-recording")'))
+  'ui.instruction-sources-separated' = ($main.Contains('selectedInstructionFiles') -and $main.Contains('instruction_source_count') -and $main.Contains('## Instruction Sources'))
   'files.multi-selection-accumulates' = ($main.Contains('fileInput.multiple = true') -and $main.Contains('selectedFiles.push'))
   'files.standard-sync-chunking' = ($main.Contains('SYNC_SAFE_CHUNK_BYTES') -and $main.Contains('.jdbparts.md') -and $main.Contains('encoding: "base64"') -and $main.Contains('sha256Hex'))
   'failure.partial-files-rollback' = ($main.Contains('await this.app.vault.delete(partial, true)'))

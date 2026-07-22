@@ -4,9 +4,10 @@ JDB Command is the mobile-first command center for **Jason's Digital Brain** ins
 
 It turns a `jdb-command` code block into one focused product screen:
 
-- dictate or type one instruction;
-- record a voice note directly, stop it explicitly, and play it back before submission;
-- add photos, audio, PDFs, documents, text, or Markdown files;
+- type, dictate, paste a public link, or record one instruction in the same command input;
+- import an instruction source such as a video, Word document, PDF, presentation, spreadsheet, text file, or existing audio recording; JDB stores it separately for content extraction;
+- see an immediate red recording indicator, elapsed timer, and prominent stop control, then play the voice instruction back before submission;
+- add photos and reference files below as work attachments rather than instructions;
 - accumulate multiple iPhone selections;
 - preview every selected image and remove individual files;
 - submit once and receive a persistent receipt;
@@ -45,7 +46,7 @@ After the plugin is approved, open **Settings -> Community plugins -> Browse**, 
 ````
 
 2. Open the note in Reading view.
-3. Type or dictate an instruction. Use **開始錄音** for a voice note, then **停止錄音** and play back the preview; add any other photos or files as needed.
+3. Use the command input to type, dictate, paste a link, select **開始錄音**, or choose **匯入指令檔案**. While recording, confirm the red indicator and elapsed timer, then select **停止錄音** and play back the preview. Add photos or other supporting materials below with **加入照片／檔案**; these are stored separately as work attachments.
 4. Review the complete preview list and select **Submit JDB** once.
 5. Confirm that the persistent receipt appears. The command and attachments are stored together under `inbox/commands/` for JDB Runtime.
 
