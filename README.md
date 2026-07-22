@@ -13,6 +13,16 @@ It turns a `jdb-command` code block into one focused product screen:
 
 ## Installation
 
+### Beta installation while directory review is pending
+
+Until JDB Command appears in Obsidian's official Community Plugins search:
+
+1. Install and enable **BRAT** from **Settings -> Community plugins -> Browse**.
+2. Open this link on the device: `obsidian://brat?plugin=c8vzn4ym5g-ai/jdb-command`.
+3. Confirm the repository, then enable **JDB Command** under Community plugins.
+
+The BRAT channel installs the same signed-off GitHub release assets documented below. It is a temporary installation path, not evidence that official directory review has completed.
+
 ### Community Plugins directory
 
 After the plugin is approved, open **Settings -> Community plugins -> Browse**, search for **JDB Command**, select **Install**, and then select **Enable**.

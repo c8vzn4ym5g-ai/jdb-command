@@ -16,6 +16,8 @@ $checks = [ordered]@{
   'ui.preview-and-remove' = ($main.Contains('URL.createObjectURL') -and $main.Contains('jdb-command-remove-file') -and $main.Contains('aria-live'))
   'files.multi-selection-accumulates' = ($main.Contains('fileInput.multiple = true') -and $main.Contains('selectedFiles.push'))
   'failure.partial-files-rollback' = ($main.Contains('await this.app.vault.delete(partial, true)'))
+  'mobile.defer-until-layout-ready' = ($main.Contains('workspace.onLayoutReady(registerCommandBlock)') -and $main.Contains('workspace.layoutReady'))
+  'mobile.render-failure-isolated' = ($main.Contains('JDB Command render failed') -and $main.Contains('jdb-command-error'))
   'privacy.no-network-adapter' = (-not ($main -match '\b(fetch|XMLHttpRequest|WebSocket)\b'))
   'styles.mobile-layout' = ($styles.Contains('@media (max-width: 480px)'))
 }
