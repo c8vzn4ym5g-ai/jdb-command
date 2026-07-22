@@ -1,5 +1,21 @@
 const { Plugin, Notice, normalizePath } = require("obsidian");
 
+const SYNC_SAFE_CHUNK_BYTES = 4 * 1024 * 1024;
+
+function splitArrayBuffer(buffer, maximumBytes = SYNC_SAFE_CHUNK_BYTES) {
+  if (!(maximumBytes > 0)) throw new Error("Chunk size must be positive");
+  const parts = [];
+  for (let offset = 0; offset < buffer.byteLength; offset += maximumBytes) {
+    parts.push(buffer.slice(offset, Math.min(offset + maximumBytes, buffer.byteLength)));
+  }
+  return parts;
+}
+
+async function sha256Hex(buffer) {
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 const ROUTES = [
   { id: "travel-os", label: "Travel OS", pattern: /(travel|trip|coffee|cafe|café|旅遊|旅行|咖啡|遊記)/i },
   { id: "ai-family-book", label: "AI Family Book", pattern: /(ai family book|maya|manuscript|chapter|book|章節|書)/i },
@@ -174,21 +190,46 @@ class JdbCommandPlugin extends Plugin {
     await this.ensureFolder("inbox/commands");
     const links = [];
     const savedFiles = [];
+    const createdPaths = [];
     try {
       for (let index = 0; index < files.length; index += 1) {
         const file = files[index];
         const safeName = file.name.replace(/[\\/:*?"<>|]/g, "-");
         const path = normalizePath(`${commandFolder}/${id}-${index + 1}-${safeName}`);
-        const created = await this.app.vault.createBinary(path, await file.arrayBuffer());
-        const verified = this.app.vault.getAbstractFileByPath(path);
-        if (!verified || verified.stat.size !== file.size) throw new Error(`Attachment verification failed: ${path}`);
-        links.push(`- [[${path}]]`);
+        const buffer = await file.arrayBuffer();
+        let resourceUrl = "";
+        if (buffer.byteLength <= SYNC_SAFE_CHUNK_BYTES) {
+          const created = await this.app.vault.createBinary(path, buffer);
+          createdPaths.push(path);
+          const verified = this.app.vault.getAbstractFileByPath(path);
+          if (!verified || verified.stat.size !== file.size) throw new Error(`Attachment verification failed: ${path}`);
+          links.push(`- [[${path}]]`);
+          resourceUrl = file.type.startsWith("image/") ? this.app.vault.getResourcePath(created) : "";
+        } else {
+          const parts = splitArrayBuffer(buffer);
+          const manifestPath = normalizePath(`${path}.jdbparts.json`);
+          const manifestParts = [];
+          for (let partIndex = 0; partIndex < parts.length; partIndex += 1) {
+            const partPath = normalizePath(`${path}.jdbpart-${String(partIndex + 1).padStart(3, "0")}-of-${String(parts.length).padStart(3, "0")}`);
+            await this.app.vault.createBinary(partPath, parts[partIndex]);
+            createdPaths.push(partPath);
+            const verifiedPart = this.app.vault.getAbstractFileByPath(partPath);
+            if (!verifiedPart || verifiedPart.stat.size !== parts[partIndex].byteLength) throw new Error(`Chunk verification failed: ${partPath}`);
+            manifestParts.push({ path: partPath, size: parts[partIndex].byteLength });
+          }
+          const manifest = JSON.stringify({ version: 1, originalPath: path, name: file.name, type: file.type, size: file.size, sha256: await sha256Hex(buffer), parts: manifestParts }, null, 2);
+          await this.app.vault.create(manifestPath, manifest);
+          createdPaths.push(manifestPath);
+          if (!this.app.vault.getAbstractFileByPath(manifestPath)) throw new Error(`Manifest verification failed: ${manifestPath}`);
+          links.push(`- [[${manifestPath}]]`);
+          resourceUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
+        }
         savedFiles.push({
           path,
           name: file.name,
           size: file.size,
           type: file.type,
-          resourceUrl: file.type.startsWith("image/") ? this.app.vault.getResourcePath(created) : ""
+          resourceUrl
         });
       }
       const note = [
@@ -201,8 +242,8 @@ class JdbCommandPlugin extends Plugin {
       if (!this.app.vault.getAbstractFileByPath(notePath)) throw new Error(`Receipt verification failed: ${notePath}`);
       return { id, project: routed.id, projectLabel: routed.label, notePath, savedFiles };
     } catch (error) {
-      for (const saved of savedFiles) {
-        const partial = this.app.vault.getAbstractFileByPath(saved.path);
+      for (const path of createdPaths) {
+        const partial = this.app.vault.getAbstractFileByPath(path);
         if (partial) await this.app.vault.delete(partial, true);
       }
       throw error;
@@ -216,3 +257,4 @@ class JdbCommandPlugin extends Plugin {
 }
 
 module.exports = JdbCommandPlugin;
+module.exports.__test = { splitArrayBuffer, SYNC_SAFE_CHUNK_BYTES };
