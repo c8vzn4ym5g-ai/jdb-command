@@ -1,6 +1,8 @@
 const { Plugin, Notice, normalizePath } = require("obsidian");
 
-const SYNC_SAFE_CHUNK_BYTES = 4 * 1024 * 1024;
+// Base64 expands bytes by roughly one third. Three MiB source chunks remain
+// four MiB Markdown files, safely below Sync Standard's five MiB file limit.
+const SYNC_SAFE_CHUNK_BYTES = 3 * 1024 * 1024;
 
 function splitArrayBuffer(buffer, maximumBytes = SYNC_SAFE_CHUNK_BYTES) {
   if (!(maximumBytes > 0)) throw new Error("Chunk size must be positive");
@@ -9,6 +11,16 @@ function splitArrayBuffer(buffer, maximumBytes = SYNC_SAFE_CHUNK_BYTES) {
     parts.push(buffer.slice(offset, Math.min(offset + maximumBytes, buffer.byteLength)));
   }
   return parts;
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const blockSize = 0x8000;
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += blockSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + blockSize, bytes.length)));
+  }
+  return globalThis.btoa(binary);
 }
 
 async function sha256Hex(buffer) {
@@ -207,15 +219,16 @@ class JdbCommandPlugin extends Plugin {
           resourceUrl = file.type.startsWith("image/") ? this.app.vault.getResourcePath(created) : "";
         } else {
           const parts = splitArrayBuffer(buffer);
-          const manifestPath = normalizePath(`${path}.jdbparts.json`);
+          const manifestPath = normalizePath(`${path}.jdbparts.md`);
           const manifestParts = [];
           for (let partIndex = 0; partIndex < parts.length; partIndex += 1) {
-            const partPath = normalizePath(`${path}.jdbpart-${String(partIndex + 1).padStart(3, "0")}-of-${String(parts.length).padStart(3, "0")}`);
-            await this.app.vault.createBinary(partPath, parts[partIndex]);
+            const partPath = normalizePath(`${path}.jdbpart-${String(partIndex + 1).padStart(3, "0")}-of-${String(parts.length).padStart(3, "0")}.md`);
+            const encodedPart = arrayBufferToBase64(parts[partIndex]);
+            await this.app.vault.create(partPath, encodedPart);
             createdPaths.push(partPath);
             const verifiedPart = this.app.vault.getAbstractFileByPath(partPath);
-            if (!verifiedPart || verifiedPart.stat.size !== parts[partIndex].byteLength) throw new Error(`Chunk verification failed: ${partPath}`);
-            manifestParts.push({ path: partPath, size: parts[partIndex].byteLength });
+            if (!verifiedPart || verifiedPart.stat.size !== encodedPart.length) throw new Error(`Chunk verification failed: ${partPath}`);
+            manifestParts.push({ path: partPath, size: parts[partIndex].byteLength, encoding: "base64" });
           }
           const manifest = JSON.stringify({ version: 1, originalPath: path, name: file.name, type: file.type, size: file.size, sha256: await sha256Hex(buffer), parts: manifestParts }, null, 2);
           await this.app.vault.create(manifestPath, manifest);
@@ -257,4 +270,4 @@ class JdbCommandPlugin extends Plugin {
 }
 
 module.exports = JdbCommandPlugin;
-module.exports.__test = { splitArrayBuffer, SYNC_SAFE_CHUNK_BYTES };
+module.exports.__test = { splitArrayBuffer, arrayBufferToBase64, SYNC_SAFE_CHUNK_BYTES };

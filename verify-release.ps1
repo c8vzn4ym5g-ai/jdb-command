@@ -15,7 +15,7 @@ $checks = [ordered]@{
   'ui.single-screen-actions' = ($main.Contains('jdb-command-add-files') -and $main.Contains('jdb-command-submit') -and $main.Contains('jdb-command-receipt'))
   'ui.preview-and-remove' = ($main.Contains('URL.createObjectURL') -and $main.Contains('jdb-command-remove-file') -and $main.Contains('aria-live'))
   'files.multi-selection-accumulates' = ($main.Contains('fileInput.multiple = true') -and $main.Contains('selectedFiles.push'))
-  'files.standard-sync-chunking' = ($main.Contains('SYNC_SAFE_CHUNK_BYTES') -and $main.Contains('.jdbparts.json') -and $main.Contains('sha256Hex'))
+  'files.standard-sync-chunking' = ($main.Contains('SYNC_SAFE_CHUNK_BYTES') -and $main.Contains('.jdbparts.md') -and $main.Contains('encoding: "base64"') -and $main.Contains('sha256Hex'))
   'failure.partial-files-rollback' = ($main.Contains('await this.app.vault.delete(partial, true)'))
   'privacy.no-network-adapter' = (-not ($main -match '\b(fetch|XMLHttpRequest|WebSocket)\b'))
   'styles.mobile-layout' = ($styles.Contains('@media (max-width: 480px)'))
