@@ -6,11 +6,17 @@
 .jdb-command-route, .jdb-command-status { margin: .5rem 0; color: var(--text-muted); }
 .jdb-command-files { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 .jdb-command-add-files { width: 100%; min-height: 52px; margin: .6rem 0; border: 1.5px dashed var(--interactive-accent); border-radius: 12px; color: var(--interactive-accent); font-weight: 650; }
+.jdb-command-voice-actions { display: grid; grid-template-columns: 1fr; gap: .5rem; }
+.jdb-command-record-voice, .jdb-command-stop-voice { width: 100%; min-height: 52px; border-radius: 12px; font-weight: 650; }
+.jdb-command-record-voice { color: var(--interactive-accent); border: 1.5px solid var(--interactive-accent); }
+.jdb-command-stop-voice { color: var(--text-on-accent); background: var(--text-error); }
+.jdb-command-recording-status { margin: .25rem 0 .6rem; color: var(--text-muted); font-size: .86rem; line-height: 1.45; }
 .jdb-command-selection { margin: .4rem 0; color: var(--text-muted); }
 .jdb-command-selection ul { margin: .35rem 0 .6rem 1.25rem; }
 .jdb-command-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: .6rem; margin: .6rem 0; }
 .jdb-command-preview-item { min-width: 0; padding: .4rem; border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--background-primary); }
 .jdb-command-preview-item img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; }
+.jdb-command-preview-item audio { display: block; width: 100%; min-height: 44px; }
 .jdb-command-preview-item span { display: block; margin-top: .35rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; }
 .jdb-command-remove-file { width: 100%; min-height: 34px; margin-top: .35rem; color: var(--text-error); }
 .jdb-command-preview-file { display: grid; place-items: center; width: 100%; aspect-ratio: 1; border-radius: 7px; background: var(--background-secondary-alt); color: var(--text-muted); }

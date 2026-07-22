@@ -88,6 +88,13 @@ class JdbCommandPlugin extends Plugin {
     fileInput.setAttribute("aria-label", "選擇照片、語音或檔案");
     const addFiles = wrapper.createEl("button", { cls: "jdb-command-add-files", text: "加入照片／檔案" });
     addFiles.type = "button";
+    const voiceActions = wrapper.createDiv({ cls: "jdb-command-voice-actions" });
+    const recordVoice = voiceActions.createEl("button", { cls: "jdb-command-record-voice", text: "開始錄音" });
+    recordVoice.type = "button";
+    const stopVoice = voiceActions.createEl("button", { cls: "jdb-command-stop-voice", text: "停止錄音" });
+    stopVoice.type = "button";
+    stopVoice.hidden = true;
+    const recordingStatus = wrapper.createDiv({ cls: "jdb-command-recording-status", text: "尚未錄音", attr: { role: "status", "aria-live": "polite" } });
     const selection = wrapper.createDiv({ cls: "jdb-command-selection", text: "尚未加入檔案" });
     const preview = wrapper.createDiv({ cls: "jdb-command-preview" });
     const clearFiles = wrapper.createEl("button", { cls: "jdb-command-clear-files", text: "清除已選檔案" });
@@ -109,6 +116,10 @@ class JdbCommandPlugin extends Plugin {
           const image = item.createEl("img", { attr: { alt: entry.file.name } });
           image.src = URL.createObjectURL(entry.file);
           image.addEventListener("load", () => URL.revokeObjectURL(image.src), { once: true });
+        } else if (entry.file.type.startsWith("audio/")) {
+          const audio = item.createEl("audio", { attr: { controls: "", preload: "metadata" } });
+          audio.src = URL.createObjectURL(entry.file);
+          audio.addEventListener("loadedmetadata", () => URL.revokeObjectURL(audio.src), { once: true });
         } else {
           item.createDiv({ cls: "jdb-command-preview-file", text: "檔案" });
         }
@@ -133,6 +144,70 @@ class JdbCommandPlugin extends Plugin {
       }
       fileInput.value = "";
       renderSelection();
+    });
+
+    let recorder = null;
+    let recordingStream = null;
+    let recordingChunks = [];
+    const releaseMicrophone = () => {
+      if (recordingStream) recordingStream.getTracks().forEach((track) => track.stop());
+      recordingStream = null;
+    };
+    recordVoice.addEventListener("click", async () => {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+        recordingStatus.textContent = "此裝置不支援頁面錄音；可使用鍵盤麥克風口述指令，或加入既有錄音檔。";
+        new Notice("目前裝置不支援直接錄音。仍可使用鍵盤口述或加入錄音檔。");
+        return;
+      }
+      try {
+        recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recordingChunks = [];
+        recorder = new MediaRecorder(recordingStream);
+        recorder.addEventListener("dataavailable", (event) => {
+          if (event.data?.size) recordingChunks.push(event.data);
+        });
+        recorder.addEventListener("stop", () => {
+          const type = recorder.mimeType || recordingChunks[0]?.type || "audio/webm";
+          const extension = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
+          const blob = new Blob(recordingChunks, { type });
+          if (blob.size) {
+            const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+            const file = new File([blob], `JDB-voice-${stamp}.${extension}`, { type, lastModified: Date.now() });
+            const key = `${file.name}:${file.size}:${file.lastModified}`;
+            selectedFiles.push({ key, file });
+            renderSelection();
+            recordingStatus.textContent = `錄音已加入：${file.name}（送交前可播放、移除或繼續加入檔案）`;
+          } else {
+            recordingStatus.textContent = "沒有收到錄音內容，請再試一次。";
+          }
+          recordingChunks = [];
+          recorder = null;
+          releaseMicrophone();
+          recordVoice.hidden = false;
+          stopVoice.hidden = true;
+        });
+        recorder.addEventListener("error", () => {
+          recordingStatus.textContent = "錄音失敗，麥克風已停止。";
+          releaseMicrophone();
+          recordVoice.hidden = false;
+          stopVoice.hidden = true;
+        });
+        recorder.start();
+        recordVoice.hidden = true;
+        stopVoice.hidden = false;
+        recordingStatus.textContent = "正在錄音…完成後請按「停止錄音」。";
+      } catch (error) {
+        console.error("JDB voice recording failed", error);
+        releaseMicrophone();
+        recordingStatus.textContent = "無法使用麥克風。請允許 Obsidian 使用麥克風，或加入既有錄音檔。";
+        new Notice("無法使用麥克風。請檢查 iPhone 的麥克風權限。");
+      }
+    });
+    stopVoice.addEventListener("click", () => {
+      if (recorder?.state === "recording") {
+        recordingStatus.textContent = "正在整理錄音預覽…";
+        recorder.stop();
+      }
     });
     clearFiles.addEventListener("click", () => {
       selectedFiles.splice(0, selectedFiles.length);
@@ -178,6 +253,7 @@ class JdbCommandPlugin extends Plugin {
         textarea.value = "";
         selectedFiles.splice(0, selectedFiles.length);
         renderSelection();
+        recordingStatus.textContent = "尚未錄音";
         route.textContent = "Project：JDB 自動判斷";
         status.textContent = `送交成功：${result.id}`;
         renderReceipt(result);
