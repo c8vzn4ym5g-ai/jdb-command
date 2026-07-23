@@ -43,10 +43,12 @@ Module._load = function load(request, parent, isMain) {
   return originalLoad(request, parent, isMain);
 };
 
+(async () => {
 try {
   const JdbCommandPlugin = require("./main.js");
   const plugin = new JdbCommandPlugin();
-  assert.doesNotThrow(() => plugin.onload());
+  plugin.loadData = async () => ({});
+  await assert.doesNotReject(() => plugin.onload());
   assert.equal(commandRegistrations, 1, "command registration should remain available during startup");
   assert.equal(processorRegistrations, 0, "mobile UI must not initialize before layout readiness");
   assert.equal(typeof layoutCallback, "function", "layout-ready callback must be registered");
@@ -56,3 +58,7 @@ try {
 } finally {
   Module._load = originalLoad;
 }
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

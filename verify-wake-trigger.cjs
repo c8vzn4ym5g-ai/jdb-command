@@ -54,7 +54,15 @@ assert.deepEqual(SYNCED_WAKE_CONFIG_PATHS, [
   "config/local.wake.md"
 ]);
 
+const source = require("node:fs").readFileSync(require.resolve("./main.js"), "utf8");
+assert.match(source, /reason:\s*"sync-event"/, "successful save reports Sync event delivery");
+assert.doesNotMatch(
+  source,
+  /const wake = await this\.notifyWake\(id\)/,
+  "submit does not depend on an unreachable third-party wake service"
+);
+
 process.stdout.write(JSON.stringify({
   passed: true,
-  evidence: "wake request is id-only, replayable, and can use a private Vault-synced HTTPS endpoint"
+  evidence: "submission uses Obsidian Sync events while legacy wake requests remain content-free and private"
 }));

@@ -458,7 +458,10 @@ class JdbCommandPlugin extends Plugin {
       const notePath = normalizePath(`${commandFolder}/${id}.md`);
       await this.app.vault.create(notePath, note);
       if (!this.app.vault.getAbstractFileByPath(notePath)) throw new Error(`Receipt verification failed: ${notePath}`);
-      const wake = await this.notifyWake(id);
+      // Obsidian Sync writes the verified command into the desktop Vault.
+      // The hidden desktop receiver reacts to that filesystem event, so the
+      // mobile client does not depend on a third-party wake service.
+      const wake = { ok: true, reason: "sync-event" };
       return { id, project: routed.id, projectLabel: routed.label, notePath, savedFiles, wake };
     } catch (error) {
       for (const path of createdPaths) {
