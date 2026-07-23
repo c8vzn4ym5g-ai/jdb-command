@@ -1,8 +1,32 @@
-const { Plugin, Notice, normalizePath } = require("obsidian");
+const { Plugin, Notice, normalizePath, requestUrl } = require("obsidian");
 
 // Base64 expands bytes by roughly one third. Three MiB source chunks remain
 // four MiB Markdown files, safely below Sync Standard's five MiB file limit.
 const SYNC_SAFE_CHUNK_BYTES = 3 * 1024 * 1024;
+const DEFAULT_SETTINGS = Object.freeze({ wakeEndpoint: "" });
+const COMMAND_ID_PATTERN = /^\d{17}-[a-f0-9]{8}$/;
+
+function validateCommandId(id) {
+  if (!COMMAND_ID_PATTERN.test(id)) throw new Error(`Invalid JDB command id: ${id}`);
+  return id;
+}
+
+function buildWakeRequest(endpoint, id) {
+  if (!endpoint) return null;
+  const url = new URL(endpoint);
+  if (url.protocol !== "https:") throw new Error("JDB wake endpoint must use HTTPS");
+  return {
+    url: url.toString(),
+    method: "POST",
+    contentType: "text/plain; charset=utf-8",
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      Firebase: "no"
+    },
+    body: validateCommandId(id),
+    throw: false
+  };
+}
 
 function splitArrayBuffer(buffer, maximumBytes = SYNC_SAFE_CHUNK_BYTES) {
   if (!(maximumBytes > 0)) throw new Error("Chunk size must be positive");
@@ -45,7 +69,8 @@ function routeCommand(text) {
 }
 
 class JdbCommandPlugin extends Plugin {
-  onload() {
+  async onload() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     this.addCommand({
       id: "open-jdb-home",
       name: "Open JDB command center",
@@ -298,7 +323,10 @@ class JdbCommandPlugin extends Plugin {
       receipt.empty();
       receipt.hidden = false;
       receipt.createEl("h3", { text: "JDB 收件回執" });
-      receipt.createDiv({ cls: "receipt-status", text: "處理狀態：已進入 JDB 收件箱" });
+      const wakeText = result.wake.ok
+        ? "處理狀態：已儲存並喚醒 JDB"
+        : "處理狀態：已安全儲存；喚醒待重試";
+      receipt.createDiv({ cls: "receipt-status", text: wakeText });
       receipt.createDiv({ cls: "receipt-id", text: `收件編號：${result.id}` });
       receipt.createDiv({ cls: "receipt-project", text: `Project：${result.projectLabel}` });
       receipt.createDiv({ cls: "receipt-file-count", text: `已收到 ${result.savedFiles.length} 個檔案` });
@@ -332,9 +360,13 @@ class JdbCommandPlugin extends Plugin {
         renderSelection();
         recordingStatus.textContent = "可輸入文字，或按麥克風錄製語音指令";
         route.textContent = "Project：JDB 自動判斷";
-        status.textContent = `送交成功：${result.id}`;
-        renderReceipt(result);
-        new Notice(`JDB 已收到任務與 ${result.savedFiles.length} 個檔案。`);
+         status.textContent = result.wake.ok
+           ? `送交成功並已喚醒：${result.id}`
+           : `已安全儲存，喚醒待重試：${result.id}`;
+         renderReceipt(result);
+         new Notice(result.wake.ok
+           ? `JDB 已收到任務與 ${result.savedFiles.length} 個檔案，後端已喚醒。`
+           : "任務已安全儲存；喚醒服務暫時未確認，JDB 會在下次連線時重試。");
       } catch (error) {
         console.error("JDB command submission failed", error);
         status.textContent = "送交失敗；指令與檔案仍保留，請檢查同步後再試一次。";
@@ -412,13 +444,29 @@ class JdbCommandPlugin extends Plugin {
       const notePath = normalizePath(`${commandFolder}/${id}.md`);
       await this.app.vault.create(notePath, note);
       if (!this.app.vault.getAbstractFileByPath(notePath)) throw new Error(`Receipt verification failed: ${notePath}`);
-      return { id, project: routed.id, projectLabel: routed.label, notePath, savedFiles };
+      const wake = await this.notifyWake(id);
+      return { id, project: routed.id, projectLabel: routed.label, notePath, savedFiles, wake };
     } catch (error) {
       for (const path of createdPaths) {
         const partial = this.app.vault.getAbstractFileByPath(path);
         if (partial) await this.app.vault.delete(partial, true);
       }
       throw error;
+    }
+  }
+
+  async notifyWake(id) {
+    const request = buildWakeRequest(this.settings?.wakeEndpoint, id);
+    if (!request) return { ok: false, reason: "not-configured" };
+    try {
+      const response = await requestUrl(request);
+      if (response.status < 200 || response.status >= 300) {
+        return { ok: false, reason: `http-${response.status}` };
+      }
+      return { ok: true };
+    } catch (error) {
+      console.error("JDB wake notification failed", error);
+      return { ok: false, reason: "network-error" };
     }
   }
 
@@ -429,4 +477,11 @@ class JdbCommandPlugin extends Plugin {
 }
 
 module.exports = JdbCommandPlugin;
-module.exports.__test = { splitArrayBuffer, arrayBufferToBase64, formatRecordingTime, SYNC_SAFE_CHUNK_BYTES };
+module.exports.__test = {
+  splitArrayBuffer,
+  arrayBufferToBase64,
+  formatRecordingTime,
+  validateCommandId,
+  buildWakeRequest,
+  SYNC_SAFE_CHUNK_BYTES
+};

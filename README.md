@@ -10,7 +10,7 @@ It turns a `jdb-command` code block into one focused product screen:
 - add photos and reference files below as work attachments rather than instructions;
 - accumulate multiple iPhone selections;
 - preview every selected image and remove individual files;
-- submit once and receive a persistent receipt;
+- submit once, wake the Windows backend, and receive a persistent receipt;
 - store the command and attachments together in `inbox/commands/` for JDB Runtime.
 
 ## Installation
@@ -52,7 +52,7 @@ After the plugin is approved, open **Settings -> Community plugins -> Browse**, 
 
 If direct recording is unavailable, JDB Command keeps two fallbacks on the same screen: use the iPhone keyboard microphone to dictate the instruction, or use **加入照片／檔案** to attach an existing recording. A microphone denial never discards the typed command or files already selected.
 
-The plugin never sends vault content to a third-party service. It writes through Obsidian's Vault interface and is compatible with desktop and mobile (`isDesktopOnly: false`).
+The plugin never sends instruction text, attachment content, filenames, or Vault paths to the wake service. After the command is safely written through Obsidian's Vault interface, it sends only the opaque receipt ID to an unguessable, high-entropy HTTPS capability endpoint. The wake service may retain that opaque ID briefly so a disconnected receiver can replay it after reconnecting; the actual command and files continue to travel exclusively through Obsidian Sync. The plugin is compatible with desktop and mobile (`isDesktopOnly: false`).
 
 ## Release assets
 

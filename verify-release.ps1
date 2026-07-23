@@ -20,7 +20,7 @@ $checks = [ordered]@{
   'files.multi-selection-accumulates' = ($main.Contains('fileInput.multiple = true') -and $main.Contains('selectedFiles.push'))
   'files.standard-sync-chunking' = ($main.Contains('SYNC_SAFE_CHUNK_BYTES') -and $main.Contains('.jdbparts.md') -and $main.Contains('encoding: "base64"') -and $main.Contains('sha256Hex'))
   'failure.partial-files-rollback' = ($main.Contains('await this.app.vault.delete(partial, true)'))
-  'privacy.no-network-adapter' = (-not ($main -match '\b(fetch|XMLHttpRequest|WebSocket)\b'))
+  'wake.id-only-adapter' = ($main.Contains('body: validateCommandId(id)') -and -not $main.Contains('Cache: "no"') -and $main.Contains('Firebase: "no"'))
   'styles.mobile-layout' = ($styles.Contains('@media (max-width: 480px)'))
 }
 
