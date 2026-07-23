@@ -5,6 +5,10 @@ const { Plugin, Notice, normalizePath, requestUrl } = require("obsidian");
 const SYNC_SAFE_CHUNK_BYTES = 3 * 1024 * 1024;
 const DEFAULT_SETTINGS = Object.freeze({ wakeEndpoint: "" });
 const COMMAND_ID_PATTERN = /^\d{17}-[a-f0-9]{8}$/;
+const SYNCED_WAKE_CONFIG_PATHS = Object.freeze([
+  "config/local.wake.json",
+  "config/local.wake.md"
+]);
 
 function validateCommandId(id) {
   if (!COMMAND_ID_PATTERN.test(id)) throw new Error(`Invalid JDB command id: ${id}`);
@@ -26,6 +30,16 @@ function buildWakeRequest(endpoint, id) {
     body: validateCommandId(id),
     throw: false
   };
+}
+
+function parseWakeEndpoint(content) {
+  const raw = String(content || "").trim();
+  if (!raw) return "";
+  const endpoint = raw.startsWith("{") ? JSON.parse(raw).endpoint : raw;
+  if (!endpoint) return "";
+  const url = new URL(endpoint);
+  if (url.protocol !== "https:") throw new Error("JDB wake endpoint must use HTTPS");
+  return url.toString().replace(/\/$/, "");
 }
 
 function splitArrayBuffer(buffer, maximumBytes = SYNC_SAFE_CHUNK_BYTES) {
@@ -456,7 +470,8 @@ class JdbCommandPlugin extends Plugin {
   }
 
   async notifyWake(id) {
-    const request = buildWakeRequest(this.settings?.wakeEndpoint, id);
+    const endpoint = await this.resolveWakeEndpoint();
+    const request = buildWakeRequest(endpoint, id);
     if (!request) return { ok: false, reason: "not-configured" };
     try {
       const response = await requestUrl(request);
@@ -468,6 +483,20 @@ class JdbCommandPlugin extends Plugin {
       console.error("JDB wake notification failed", error);
       return { ok: false, reason: "network-error" };
     }
+  }
+
+  async resolveWakeEndpoint() {
+    const configured = parseWakeEndpoint(this.settings?.wakeEndpoint);
+    if (configured) return configured;
+
+    const adapter = this.app.vault.adapter;
+    for (const configPath of SYNCED_WAKE_CONFIG_PATHS) {
+      if (await adapter.exists(configPath)) {
+        const endpoint = parseWakeEndpoint(await adapter.read(configPath));
+        if (endpoint) return endpoint;
+      }
+    }
+    return "";
   }
 
   async ensureFolder(path) {
@@ -483,5 +512,7 @@ module.exports.__test = {
   formatRecordingTime,
   validateCommandId,
   buildWakeRequest,
+  parseWakeEndpoint,
+  SYNCED_WAKE_CONFIG_PATHS,
   SYNC_SAFE_CHUNK_BYTES
 };
